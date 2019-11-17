@@ -2,7 +2,7 @@ package com.github.wpanas.jpatoxlsx;
 
 import com.github.wpanas.jpatoxlsx.model.Book;
 import com.github.wpanas.jpatoxlsx.model.BookRepository;
-import lombok.extern.log4j.Log4j;
+import lombok.extern.slf4j.Slf4j;
 import org.apache.poi.xssf.streaming.SXSSFWorkbook;
 import org.springframework.batch.core.JobExecution;
 import org.springframework.batch.core.JobExecutionListener;
@@ -13,25 +13,27 @@ import java.io.IOException;
 import java.util.HashSet;
 import java.util.Set;
 
-@Log4j
+import static javax.batch.runtime.BatchStatus.COMPLETED;
+
+@Slf4j
 public class JobListener implements JobExecutionListener {
     private final SXSSFWorkbook workbook;
-    private final FileOutputStream outputStream;
+    private final BookRepository bookRepository;
+    private final FileOutputStream fileOutputStream;
 
-    public JobListener(SXSSFWorkbook workbook, BookRepository bookRepository) throws IOException {
+    JobListener(SXSSFWorkbook workbook, FileOutputStream fileOutputStream, BookRepository bookRepository) {
         this.workbook = workbook;
-        this.outputStream = new FileOutputStream("/tmp/export.xlsx");
-
-        initializeBooks(bookRepository);
+        this.bookRepository = bookRepository;
+        this.fileOutputStream = fileOutputStream;
     }
 
     @Override
     public void afterJob(JobExecution jobExecution) {
         BatchStatus batchStatus = jobExecution.getStatus().getBatchStatus();
-        if (batchStatus.equals(BatchStatus.COMPLETED)) {
+        if (batchStatus == COMPLETED) {
             try {
-                this.workbook.write(outputStream);
-                outputStream.close();
+                workbook.write(fileOutputStream);
+                fileOutputStream.close();
                 workbook.dispose();
             } catch (IOException e) {
                 log.error(e.getMessage(), e);
@@ -39,16 +41,16 @@ public class JobListener implements JobExecutionListener {
         }
     }
 
-    private void initializeBooks(BookRepository bookRepository) {
-        Set<Book> bookSet = new HashSet<>();
-        Book.BookBuilder builder = Book.builder();
-        bookSet.add(builder.author("John Doe").title("Forbbiden tails").isbn("1111-111-111-111").build());
-        bookSet.add(builder.author("Mary Doe").title("Not found title").isbn("2222-222-222-222").build());
-        bookRepository.save(bookSet);
-    }
-
     @Override
     public void beforeJob(JobExecution jobExecution) {
+        initializeBooks(bookRepository);
+    }
 
+    private void initializeBooks(BookRepository bookRepository) {
+        Set<Book> books = new HashSet<>();
+        Book.BookBuilder builder = Book.builder();
+        books.add(builder.author("John Doe").title("Forbbiden tails").isbn("1111-111-111-111").build());
+        books.add(builder.author("Mary Doe").title("Not found title").isbn("2222-222-222-222").build());
+        bookRepository.saveAll(books);
     }
 }
