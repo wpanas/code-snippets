@@ -2,6 +2,8 @@ package com.github.wpanas.jpatoxlsx;
 
 import com.github.wpanas.jpatoxlsx.model.Book;
 import com.github.wpanas.jpatoxlsx.model.BookRepository;
+import org.apache.poi.ss.usermodel.Workbook;
+import org.apache.poi.xssf.streaming.SXSSFSheet;
 import org.apache.poi.xssf.streaming.SXSSFWorkbook;
 import org.springframework.batch.core.Job;
 import org.springframework.batch.core.JobExecutionListener;
@@ -17,13 +19,20 @@ import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.data.jpa.repository.config.EnableJpaRepositories;
 
+import java.io.FileNotFoundException;
+import java.io.FileOutputStream;
 import java.io.IOException;
+
+import static java.util.Collections.singletonMap;
+import static org.springframework.data.domain.Sort.Direction.ASC;
 
 @Configuration
 @EnableBatchProcessing
 @EnableJpaRepositories
 public class BatchConfiguration {
-    private static Integer CHUNK = 100;
+    private static final Integer CHUNK = 100;
+    private static final String EXPORT_FILENAME = "/tmp/export.xlsx";
+
     private final JobBuilderFactory jobBuilderFactory;
     private final StepBuilderFactory stepBuilderFactory;
 
@@ -34,8 +43,13 @@ public class BatchConfiguration {
     }
 
     @Bean
-    public SXSSFWorkbook workbook() {
+    public Workbook workbook() {
         return new SXSSFWorkbook(CHUNK);
+    }
+
+    @Bean
+    public FileOutputStream fileOutputStream() throws FileNotFoundException {
+        return new FileOutputStream(EXPORT_FILENAME);
     }
 
     @Bean
@@ -61,16 +75,18 @@ public class BatchConfiguration {
         reader.setRepository(repository);
         reader.setMethodName("findAll");
         reader.setPageSize(CHUNK);
+        reader.setSort(singletonMap("id", ASC));
         return reader;
     }
 
     @Bean
     public ItemWriter<Book> bookWriter(SXSSFWorkbook workbook) {
-        return new BookWriter(workbook);
+        SXSSFSheet sheet = workbook.createSheet("Books");
+        return new BookWriter(sheet);
     }
 
     @Bean
-    JobListener jobListener(SXSSFWorkbook workbook, BookRepository bookRepository) throws IOException {
-        return new JobListener(workbook, bookRepository);
+    JobListener jobListener(SXSSFWorkbook workbook, FileOutputStream fileOutputStream, BookRepository bookRepository) throws IOException {
+        return new JobListener(workbook, fileOutputStream, bookRepository);
     }
 }

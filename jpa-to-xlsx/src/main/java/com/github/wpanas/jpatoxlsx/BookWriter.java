@@ -1,49 +1,49 @@
 package com.github.wpanas.jpatoxlsx;
 
 import com.github.wpanas.jpatoxlsx.model.Book;
-import org.apache.poi.xssf.streaming.SXSSFCell;
-import org.apache.poi.xssf.streaming.SXSSFRow;
-import org.apache.poi.xssf.streaming.SXSSFSheet;
-import org.apache.poi.xssf.streaming.SXSSFWorkbook;
+import org.apache.poi.ss.usermodel.Cell;
+import org.apache.poi.ss.usermodel.Row;
+import org.apache.poi.ss.usermodel.Sheet;
 import org.springframework.batch.item.ItemWriter;
 
 import java.util.List;
 
+import static java.util.Arrays.asList;
+
 
 public class BookWriter implements ItemWriter<Book> {
-    private final SXSSFSheet sheet;
-    private Integer currentRowNumber;
-    private Integer currentColumnNumber;
-    private SXSSFRow row;
+    private final Sheet sheet;
 
-    BookWriter(SXSSFWorkbook workbook) {
-        this.sheet = workbook.createSheet("Books");
-        this.currentRowNumber = 0;
-        this.currentColumnNumber = 0;
+    BookWriter(Sheet sheet) {
+        this.sheet = sheet;
     }
 
     @Override
     public void write(List<? extends Book> list) {
-        list.forEach(this::writeBook);
+        for (int i = 0; i < list.size(); i++) {
+            writeRow(i, list.get(i));
+        }
     }
 
-    private void writeBook(Book book) {
-        addRow();
-        addCell(book.getId().toString());
-        addCell(book.getAuthor());
-        addCell(book.getTitle());
-        addCell(book.getIsbn());
+    private void writeRow(int currentRowNumber, Book book) {
+        List<String> columns = prepareColumns(book);
+        Row row = this.sheet.createRow(currentRowNumber);
+        for (int i = 0; i < columns.size(); i++) {
+            writeCell(row, i, columns.get(i));
+        }
     }
 
-    private void addRow() {
-        row = this.sheet.createRow(currentRowNumber);
-        currentRowNumber++;
-        currentColumnNumber = 0;
+    private List<String> prepareColumns(Book book) {
+        return asList(
+                book.getId().toString(),
+                book.getAuthor(),
+                book.getTitle(),
+                book.getIsbn()
+        );
     }
 
-    private void addCell(String value) {
-        SXSSFCell cell = row.createCell(currentColumnNumber);
+    private void writeCell(Row row, int currentColumnNumber, String value) {
+        Cell cell = row.createCell(currentColumnNumber);
         cell.setCellValue(value);
-        currentColumnNumber++;
     }
 }
